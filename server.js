@@ -14,6 +14,7 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const flash = require('connect-flash');
 
 const app = express();
 const port = process.env.PORT || 8080;
@@ -62,6 +63,9 @@ require('./config/passport')(passport);
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Flash messages middleware
+app.use(flash());
+
 // Middleware
 app.engine('ejs', ejsMate);
 app.set('view engine', 'ejs');
@@ -100,7 +104,9 @@ app.get('/', (req, res) => {
 
 // Auth routes
 app.get('/login', (req, res) => {
-  res.render('login');
+  const errorMessages = req.flash('error');
+  const message = errorMessages.length > 0 ? errorMessages[0] : null;
+  res.render('login', { message });
 });
 
 app.get('/register', (req, res) => {
@@ -148,17 +154,13 @@ app.get('/events', async (req, res) => {
     let sql = `
       SELECT
         e.*,
-        c.CATEGORY_NAME,
-        GROUP_CONCAT(t.TAG_NAME) as TAGS
+        c.CATEGORY_NAME
       FROM EVENT e
       LEFT JOIN CATEGORY c ON e.CATEGORY_ID = c.CATEGORY_ID
-      LEFT JOIN EVENT_TAG et ON e.EVENT_ID = et.EVENT_ID
-      LEFT JOIN TAG t ON et.TAG_ID = t.TAG_ID
       WHERE 1=1
     `;
     let params = [];
     let conditions = [];
-    let groupBy = ' GROUP BY e.EVENT_ID';
 
     // User-based filtering
     if (req.user && req.user.ROLE === 'attendee') {
@@ -175,9 +177,11 @@ app.get('/events', async (req, res) => {
 
     // Search functionality
     if (req.query.search && req.query.search.trim()) {
-      conditions.push('(EVENT_NAME LIKE ? OR DESCRIPTION LIKE ?)');
+      conditions.push('(e.EVENT_NAME LIKE ? OR e.DESCRIPTION LIKE ?)');
       const searchTerm = `%${req.query.search.trim()}%`;
       params.push(searchTerm, searchTerm);
+      console.log('Search query:', req.query.search.trim());
+      console.log('Search term:', searchTerm);
     }
 
     // Filter by date
@@ -197,9 +201,6 @@ app.get('/events', async (req, res) => {
     if (conditions.length > 0) {
       sql += ' AND ' + conditions.join(' AND ');
     }
-
-    // Group by for aggregate functions
-    sql += ' GROUP BY e.EVENT_ID';
 
     // Sort order - default to ascending (oldest first)
     const sortOrder = req.query.sort === 'desc' ? 'DESC' : 'ASC';

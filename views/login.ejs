@@ -9,7 +9,11 @@
       <div class="card-header text-center bg-transparent border-0 mt-3">
         <h2 class="fw-bold" style="color: #0d6efd">Welcome Back</h2>
         <p class="text-muted mb-2">
-          Login to continue to <strong>NexEvent</strong>
+          <% if(typeof message !== 'undefined' && message) { %>
+            Please try again
+          <% } else { %>
+            Login to continue to <strong>NexEvent</strong>
+          <% } %>
         </p>
       </div>
 
